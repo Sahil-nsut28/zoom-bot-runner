@@ -1,5 +1,22 @@
 import unittest
-from join_status import classify, wait_for_join
+from join_status import classify, wait_for_join, join_button_ready
+
+
+class Button:
+    def __init__(self, classes='', displayed=True, enabled=True, aria_disabled=None, tabindex=None):
+        self.attributes = {'class': classes, 'aria-disabled': aria_disabled, 'tabindex': tabindex}
+        self.displayed = displayed
+        self.enabled = enabled
+
+    def get_attribute(self, name):
+        return self.attributes.get(name)
+
+    def is_displayed(self):
+        return self.displayed
+
+    def is_enabled(self):
+        return self.enabled
+
 
 class Driver:
     def __init__(self, snapshots):
@@ -8,6 +25,12 @@ class Driver:
         return next(self.snapshots)
 
 class JoinStatusTests(unittest.TestCase):
+    def test_disabled_join_button_is_not_ready(self):
+        self.assertFalse(join_button_ready(Button('zm-btn preview-join-button disabled zm-btn--disabled', tabindex='-1')))
+        self.assertFalse(join_button_ready(Button('preview-join-button', enabled=False)))
+        self.assertFalse(join_button_ready(Button('preview-join-button', aria_disabled='true')))
+        self.assertTrue(join_button_ready(Button('preview-join-button')))
+
     def test_prejoin_is_not_success(self):
         self.assertEqual(classify({'text': 'Join Meeting', 'buttons': ['Join']})[0], 'unknown')
     def test_waiting_room_is_not_success(self):
