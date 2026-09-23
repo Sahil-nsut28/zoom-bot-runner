@@ -15,8 +15,12 @@ import time
 import os
 import sys
 from pathlib import Path
-from join_status import wait_for_join, read_status
+from join_status import wait_for_join, read_status, join_button_ready
 from datetime import datetime
+
+
+class MissingPasscodeError(RuntimeError):
+    pass
 
 # Get configuration from environment variables
 START_RANGE = int(os.environ.get('START_RANGE', '1'))
@@ -167,6 +171,10 @@ def launch_bot(bot_id):
         
         # Find password input
         pwd_input = None
+        if not MEETING_PASSCODE and any(
+                field.is_displayed() for field in driver.find_elements(
+                    By.CSS_SELECTOR, 'input[type="password"], input[id*="pwd"], input[id*="passcode"]')):
+            raise MissingPasscodeError('Zoom requires a meeting passcode. Set meeting_passcode when starting the workflow.')
         if MEETING_PASSCODE:
             for selector in ['input-for-pwd', 'inputpasscode', 'join-dialog-passcode']:
                 try:
@@ -180,6 +188,12 @@ def launch_bot(bot_id):
         name_input.send_keys(bot_name)
         time.sleep(0.5)
         
+        if MEETING_PASSCODE and pwd_input is None:
+            for field in driver.find_elements(By.CSS_SELECTOR, 'input[type="password"], input[id*="pwd"], input[id*="passcode"]'):
+                if field.is_displayed():
+                    pwd_input = field
+                    break
+
         if pwd_input and MEETING_PASSCODE:
             pwd_input.clear()
             pwd_input.send_keys(MEETING_PASSCODE)
@@ -202,6 +216,10 @@ def launch_bot(bot_id):
         
         if join_btn is None:
             raise RuntimeError('Join button not found; join was not submitted')
+        try:
+            wait.until(lambda _: join_button_ready(join_btn))
+        except TimeoutException as error:
+            raise RuntimeError('Join button stayed disabled; check meeting passcode and Zoom prompts') from error
         join_btn.click()
         wait_for_join(driver, timeout=int(os.environ.get('JOIN_TIMEOUT', '120')),
                       report=lambda message: log(f'Bot {bot_id+1}: {message}'))
@@ -217,6 +235,9 @@ def launch_bot(bot_id):
                 driver.quit()
             except:
                 pass
+        if isinstance(e, MissingPasscodeError):
+            log('Stopping: all bots would need the same missing meeting passcode')
+            raise SystemExit(1) from e
         return None
 
 # Main execution
