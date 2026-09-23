@@ -1,0 +1,99 @@
+name: Zoom Bot Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_range:
+        description: 'Starting name number'
+        required: true
+        default: '1'
+      end_range:
+        description: 'Ending name number'
+        required: true
+        default: '30'
+      number_of_bots:
+        description: 'Number of bots to launch'
+        required: true
+        default: '10'
+      meeting_id:
+        description: 'Zoom Meeting ID'
+        required: true
+      meeting_passcode:
+        description: 'Meeting Passcode (leave blank if none)'
+        required: false
+        default: ''
+      custom_name:
+        description: 'Custom bot name (leave blank for random)'
+        required: false
+        default: ''
+      run_duration:
+        description: 'How long to keep bots running (minutes)'
+        required: true
+        default: '60'
+
+jobs:
+  run-zoom-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Setup Chrome and ChromeDriver
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+      
+      - name: Verify Chrome installation
+        run: |
+          echo "Chrome version:"
+          google-chrome --version
+          echo "Chrome location:"
+          which google-chrome
+      
+      - name: Install Python dependencies
+        run: |
+          pip install selenium webdriver-manager undetected-chromedriver psutil
+      
+      - name: Install Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      
+      - name: Start virtual display
+        run: |
+          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+          sleep 2
+      
+      - name: Run Zoom Bot
+        env:
+          START_RANGE: ${{ github.event.inputs.start_range }}
+          END_RANGE: ${{ github.event.inputs.end_range }}
+          NUMBER_OF_BOTS: ${{ github.event.inputs.number_of_bots }}
+          MEETING_ID: ${{ github.event.inputs.meeting_id }}
+          MEETING_PASSCODE: ${{ github.event.inputs.meeting_passcode }}
+          CUSTOM_NAME: ${{ github.event.inputs.custom_name }}
+          RUN_DURATION: ${{ github.event.inputs.run_duration }}
+        run: |
+          echo "Starting Zoom Bot..."
+          echo "Name range: $START_RANGE to $END_RANGE"
+          echo "Number of bots: $NUMBER_OF_BOTS"
+          echo "Meeting ID: $MEETING_ID"
+          python zoom_bot_actions.py
+      
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-logs
+          path: |
+            bot_logs.txt
+            diagnostics/*.png
+          retention-days: 7
