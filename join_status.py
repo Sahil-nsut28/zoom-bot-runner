@@ -5,6 +5,14 @@ Unknown or changed UI fails closed rather than reporting a successful join.
 """
 import time
 
+
+def join_button_ready(button):
+    classes = (button.get_attribute('class') or '').split()
+    return (button.is_displayed() and button.is_enabled()
+            and 'disabled' not in classes and 'zm-btn--disabled' not in classes
+            and button.get_attribute('aria-disabled') != 'true'
+            and button.get_attribute('tabindex') != '-1')
+
 SNAPSHOT = r"""
 const visible = el => !!(el && el.getClientRects().length &&
     getComputedStyle(el).visibility !== 'hidden');
